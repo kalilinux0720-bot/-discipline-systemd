@@ -5,8 +5,8 @@ from .models import TeacherProfile
 
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
-    """Create teacher profile when user is added to ClassTeacher group"""
-    if created and instance.groups.filter(name='ClassTeacher').exists():
+    """Create teacher profile for every new user"""
+    if created:
         TeacherProfile.objects.get_or_create(user=instance)
 
 @receiver(post_save, sender=User)

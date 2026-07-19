@@ -45,8 +45,14 @@ from .models import (
     PasswordReset,
     School,
     GradeLevel,
-    AcademicTerm
+    AcademicTerm,
+    RateLimitLog,
+    ReportHistory,
+    Sanction,
+    Appeal,
+    CommunicationLog,
 )
+from .models import create_admin_notification, create_user_notification
 # ============================================
 # HELPERS
 # ============================================
@@ -136,12 +142,38 @@ def _create_report(request, student, post):
         report.category_name = custom_case
         report.save(update_fields=['category_name'])
 
-    rating_label = get_rating_label(rating)
-    messages.success(
-        request,
-        f'? Report submitted for {student.name}: {category_name} '
-        f'(Points: +{report.points}, Rating: {rating_label})'
+    # Rate limiting / anomaly flagging: throttle per teacher->student per day
+    today = timezone.now().date()
+    day_count = RateLimitLog.objects.filter(
+        reported_by=request.user, student=student,
+        reported_at__date=today,
+    ).count()
+    flagged = day_count >= 3  # same teacher files 3+ on one student same day
+    RateLimitLog.objects.create(
+        reported_by=request.user, student=student, flagged=flagged
     )
+    if flagged:
+        create_admin_notification(
+            f'🚨 Anomaly: {request.user.username} on {student.name}',
+            f'{day_count + 1} reports filed by {request.user.username} against '
+            f'{student.name} today. Please review for potential abuse.',
+            'critical', student
+        )
+
+    rating_label = get_rating_label(rating)
+    if report.requires_approval:
+        messages.success(
+            request,
+            f'? Report submitted for {student.name}: {category_name} '
+            f'(Points: +{report.points}, Rating: {rating_label}). '
+            f'⏳ Awaiting second staff approval before it is finalized.'
+        )
+    else:
+        messages.success(
+            request,
+            f'? Report submitted for {student.name}: {category_name} '
+            f'(Points: +{report.points}, Rating: {rating_label})'
+        )
     return True
 
 
@@ -1089,6 +1121,7 @@ def student_recommendations(request, student_id):
 
         return JsonResponse({
             'student': student_data,
+            'explain_risk': student.explain_risk(),
             'recommendations': recommendations,
             'total_reports': total_reports,
             'category_breakdown': list(category_breakdown),
@@ -1700,7 +1733,6 @@ def school_setup(request):
     unread_notifications = request.user.notifications.filter(is_read=False)
 
     context = {
-        'streams': Stream.objects.filter(is_active=True).order_by('name'),
         'school': school,
         'grades': GradeLevel.objects.filter(school=school).order_by('order', 'name'),
         'streams': Stream.objects.filter(school=school, is_active=True).order_by('name'),
@@ -3168,3 +3200,746 @@ def media_test(request):
         'debug': settings.DEBUG,
         'message': 'Media serving is working!'
     })
+
+
+# ============================================
+# ATTENDANCE VIEWS
+# ============================================
+
+@login_required
+def attendance_list(request):
+    stream_filter = request.GET.get('stream')
+    form_filter = request.GET.get('form')
+    date_filter = request.GET.get('date', timezone.now().date().isoformat())
+    
+    attendance_qs = AttendanceRecord.objects.all()
+    if stream_filter:
+        attendance_qs = attendance_qs.filter(stream_id=stream_filter)
+    if form_filter:
+        attendance_qs = attendance_qs.filter(form=form_filter)
+    attendance_qs = attendance_qs.filter(date=date_filter).select_related('student__stream')
+    
+    stats = {
+        'total': attendance_qs.count(),
+        'present': attendance_qs.filter(status='PRESENT').count(),
+        'absent': attendance_qs.filter(status='ABSENT').count(),
+        'late': attendance_qs.filter(status='LATE').count(),
+        'excused': attendance_qs.filter(status='EXCUSED').count(),
+        'attendance_rate': 0,
+    }
+    if stats['total'] > 0:
+        stats['attendance_rate'] = round(stats['present'] / stats['total'] * 100, 1)
+    
+    context = {
+        'streams': Stream.objects.filter(is_active=True).order_by('name'),
+        'forms': _get_form_choices(),
+        'attendance_records': attendance_qs.order_by('student__name'),
+        'stats': stats,
+        'selected_date': date_filter,
+        'notification_count': request.user.notifications.filter(is_read=False).count(),
+        'unread_notifications': request.user.notifications.filter(is_read=False).order_by('-created_at')[:20],
+    }
+    return render(request, 'attendance_list.html', context)
+
+
+@csrf_exempt
+@login_required
+def api_qr_checkin(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST method required'}, status=405)
+    try:
+        data = json.loads(request.body)
+        qr_code = data.get('qr_code', '').strip()
+        stream_id = data.get('stream_id')
+        
+        if not qr_code or not stream_id:
+            return JsonResponse({'success': False, 'error': 'qr_code and stream_id required'}, status=400)
+        
+        student = Student.objects.filter(admission_number=qr_code, is_active=True).first()
+        if not student:
+            return JsonResponse({'success': False, 'error': 'Invalid QR code'}, status=404)
+        
+        stream = Stream.objects.get(id=stream_id, is_active=True)
+        today = timezone.now().date()
+        
+        attendance, created = AttendanceRecord.objects.update_or_create(
+            student=student, date=today, stream=stream, defaults={
+                'form': student.form,
+                'status': 'PRESENT',
+                'checkin_method': 'QR_CODE',
+                'qr_code_data': qr_code,
+                'check_in_time': timezone.now(),
+                'marked_by': request.user,
+            }
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'student_name': student.name,
+            'admission_number': student.admission_number,
+            'status': attendance.status,
+            'created': created,
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+# ============================================
+# GAMIFICATION VIEWS
+# ============================================
+
+@login_required
+def gamification_dashboard(request):
+    students = Student.objects.filter(is_active=True).select_related('stream')
+    
+    top_students = []
+    for student in students:
+        total_points = sum(p.points for p in student.points_history.all())
+        top_students.append({
+            'student': student,
+            'total_points': total_points,
+            'rewards_count': student.rewards_earned.count(),
+        })
+    top_students.sort(key=lambda x: x['total_points'], reverse=True)
+    
+    school = School.objects.first()
+    rewards = Reward.objects.filter(school=school, is_active=True) if school else Reward.objects.none()
+    
+    recent_awards = StudentReward.objects.select_related('student', 'reward').order_by('-created_at')[:20]
+    
+    context = {
+        'top_students': top_students[:20],
+        'rewards': rewards,
+        'recent_awards': recent_awards,
+        'total_points_awarded': StudentPoints.objects.aggregate(total=Sum('points'))['total'] or 0,
+        'notification_count': request.user.notifications.filter(is_read=False).count(),
+        'unread_notifications': request.user.notifications.filter(is_read=False).order_by('-created_at')[:20],
+    }
+    return render(request, 'gamification_dashboard.html', context)
+
+
+@login_required
+def award_points(request, student_id):
+    if request.method == 'POST':
+        student = get_object_or_404(Student, id=student_id, is_active=True)
+        points = int(request.POST.get('points', 0))
+        reason = request.POST.get('reason', 'MANUAL_ADJUSTMENT')
+        description = request.POST.get('description', '')
+        
+        StudentPoints.objects.create(
+            student=student,
+            points=points,
+            reason=reason,
+            description=description,
+            awarded_by=request.user,
+        )
+        
+        from .automation import RewardAutomation
+        RewardAutomation.check_and_award_rewards(student_id)
+        
+        messages.success(request, f'Awarded {points:+.0f} points to {student.name}')
+    return redirect('gamification_dashboard')
+
+
+@login_required
+def award_reward(request, student_id):
+    if request.method == 'POST':
+        student = get_object_or_404(Student, id=student_id, is_active=True)
+        reward_id = request.POST.get('reward_id')
+        notes = request.POST.get('notes', '')
+        
+        reward = get_object_or_404(Reward, id=reward_id, is_active=True)
+        StudentReward.objects.create(
+            student=student,
+            reward=reward,
+            awarded_by=request.user,
+            notes=notes,
+        )
+        
+        from .notifications import NotificationOrchestrator
+        NotificationOrchestrator().notify_reward_earned(student, reward)
+        
+        messages.success(request, f'{student.name} earned the "{reward.name}" reward!')
+    return redirect('gamification_dashboard')
+
+
+# ============================================
+# TIMETABLE VIEWS
+# ============================================
+
+@login_required
+def timetable_view(request):
+    stream_filter = request.GET.get('stream')
+    day_filter = request.GET.get('day')
+    
+    entries = TimetableEntry.objects.filter(is_active=True)
+    if stream_filter:
+        entries = entries.filter(stream_id=stream_filter)
+    if day_filter:
+        entries = entries.filter(day=day_filter)
+    
+    days = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY']
+    day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+    
+    context = {
+        'streams': Stream.objects.filter(is_active=True).order_by('name'),
+        'entries': entries.select_related('subject', 'teacher', 'stream').order_by('day', 'start_time'),
+        'days': list(zip(days, day_names)),
+        'selected_day': day_filter,
+        'notification_count': request.user.notifications.filter(is_read=False).count(),
+        'unread_notifications': request.user.notifications.filter(is_read=False).order_by('-created_at')[:20],
+    }
+    return render(request, 'timetable.html', context)
+
+
+@login_required
+def create_timetable(request):
+    if request.method == 'POST':
+        stream_id = request.POST.get('stream')
+        subject_id = request.POST.get('subject')
+        form = request.POST.get('form')
+        day = request.POST.get('day')
+        start_time = request.POST.get('start_time')
+        end_time = request.POST.get('end_time')
+        room = request.POST.get('room', '')
+        teacher_id = request.POST.get('teacher')
+        
+        try:
+            stream = Stream.objects.get(id=stream_id, is_active=True)
+            subject = Subject.objects.get(id=subject_id)
+            teacher = User.objects.get(id=teacher_id) if teacher_id else None
+            
+            entry = TimetableEntry.objects.create(
+                school=stream.school,
+                stream=stream,
+                form=form,
+                subject=subject,
+                teacher=teacher,
+                day=day,
+                start_time=start_time,
+                end_time=end_time,
+                room=room,
+            )
+            messages.success(request, f'Timetable entry created: {entry}')
+        except Exception as e:
+            messages.error(request, f'Error creating timetable entry: {e}')
+        return redirect('timetable')
+    
+    context = {
+        'streams': Stream.objects.filter(is_active=True).order_by('name'),
+        'subjects': Subject.objects.filter(is_active=True).order_by('name'),
+        'teachers': TeacherProfile.objects.filter(is_approved=True).select_related('user').order_by('user__username'),
+        'days': TimetableEntry.DAY_CHOICES,
+        'notification_count': request.user.notifications.filter(is_read=False).count(),
+    }
+    return render(request, 'timetable_create.html', context)
+
+
+# ============================================
+# DOCUMENT VAULT VIEWS
+# ============================================
+
+@login_required
+def document_vault(request, student_id):
+    student = get_object_or_404(Student, id=student_id, is_active=True)
+    
+    if request.method == 'POST' and request.FILES.get('file'):
+        try:
+            doc = DocumentVault.objects.create(
+                student=student,
+                document_type=request.POST.get('document_type', 'OTHER'),
+                title=request.POST.get('title', 'Untitled'),
+                description=request.POST.get('description', ''),
+                file=request.FILES['file'],
+                is_confidential=request.POST.get('is_confidential') == 'on',
+                uploaded_by=request.user,
+            )
+            messages.success(request, f'Document "{doc.title}" uploaded successfully!')
+        except Exception as e:
+            messages.error(request, f'Error uploading document: {e}')
+        return redirect('document_vault', student_id=student_id)
+    
+    documents = student.documents.order_by('-created_at')
+    
+    context = {
+        'student': student,
+        'documents': documents,
+        'doc_types': DocumentVault.DOCUMENT_TYPE_CHOICES,
+        'notification_count': request.user.notifications.filter(is_read=False).count(),
+        'unread_notifications': request.user.notifications.filter(is_read=False).order_by('-created_at')[:20],
+    }
+    return render(request, 'document_vault.html', context)
+
+
+@login_required
+def delete_document(request, doc_id):
+    doc = get_object_or_404(DocumentVault, id=doc_id)
+    student_id = doc.student.id
+    try:
+        doc.file.delete()
+        doc.delete()
+        messages.success(request, 'Document deleted successfully!')
+    except Exception as e:
+        messages.error(request, f'Error deleting document: {e}')
+    return redirect('document_vault', student_id=student_id)
+
+
+# ============================================
+# PARENT PORTAL VIEWS
+# ============================================
+
+@login_required
+def parent_portal(request):
+    try:
+        parent = request.user.parent_profile
+        links = StudentParentLink.objects.filter(parent=parent).select_related('student__stream')
+        
+        children_data = []
+        for link in links:
+            student = link.student
+            reports = student.reports.order_by('-reported_at')[:5]
+            attendance = student.attendance_records.order_by('-date')[:10]
+            
+            children_data.append({
+                'link': link,
+                'student': student,
+                'recent_reports': reports,
+                'recent_attendance': attendance,
+                'total_reports': student.total_reports,
+                'risk_score': student.risk_score,
+                'risk_level': student.risk_level,
+                'total_points': sum(p.points for p in student.points_history.all()),
+                'rewards': student.rewards_earned.select_related('reward').order_by('-created_at')[:5],
+            })
+        
+        context = {
+            'children_data': children_data,
+            'notification_count': request.user.notifications.filter(is_read=False).count(),
+            'unread_notifications': request.user.notifications.filter(is_read=False).order_by('-created_at')[:20],
+        }
+        return render(request, 'parent_portal.html', context)
+    except ParentProfile.DoesNotExist:
+        messages.error(request, 'Parent profile not found. Contact administrator.')
+        return redirect('dashboard')
+
+
+@login_required
+def parent_student_detail(request, student_id):
+    try:
+        parent = request.user.parent_profile
+        link = StudentParentLink.objects.get(parent=parent, student_id=student_id)
+        student = link.student
+        
+        reports = student.reports.select_related('category', 'reported_by').order_by('-reported_at')
+        points = student.points_history.order_by('-created_at')
+        attendance = student.attendance_records.order_by('-date')
+        rewards = student.rewards_earned.select_related('reward').order_by('-created_at')
+        
+        context = {
+            'student': student,
+            'link': link,
+            'reports': reports[:20],
+            'points': points[:20],
+            'attendance': attendance[:30],
+            'rewards': rewards[:10],
+            'total_points': sum(p.points for p in points),
+            'notification_count': request.user.notifications.filter(is_read=False).count(),
+        }
+        return render(request, 'parent_student_detail.html', context)
+    except (ParentProfile.DoesNotExist, StudentParentLink.DoesNotExist):
+        messages.error(request, 'Access denied.')
+        return redirect('dashboard')
+
+
+# ============================================
+# AI AETHER VIEWS
+# ============================================
+
+@login_required
+def aether_dashboard(request):
+    students = Student.objects.filter(is_active=True)
+    total_students = students.count()
+    critical = students.filter(risk_level='CRITICAL').count()
+    warning = students.filter(risk_level='WARNING').count()
+    good = students.filter(risk_level='GOOD').count()
+    
+    recent_reports = DisciplineReport.objects.select_related('student', 'category').order_by('-reported_at')[:10]
+    
+    context = {
+        'total_students': total_students,
+        'critical_count': critical,
+        'warning_count': warning,
+        'good_count': good,
+        'recent_reports': recent_reports,
+        'categories': DisciplineCategory.objects.filter(is_active=True).order_by('order', 'name'),
+        'streams': Stream.objects.filter(is_active=True).order_by('name'),
+        'notification_count': request.user.notifications.filter(is_read=False).count(),
+        'unread_notifications': request.user.notifications.filter(is_read=False).order_by('-created_at')[:20],
+    }
+    return render(request, 'aether_dashboard.html', context)
+
+
+@login_required
+def aether_chat_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        user_message = data.get('message', '').strip()
+        student_id = data.get('student_id')
+        conversation_history = data.get('history', [])
+        
+        if not user_message:
+            return JsonResponse({'error': 'Please enter a message'}, status=400)
+        
+        from .aether_integration import AetherAI
+        ai = AetherAI()
+        result = ai.chat(user_message, student_id=student_id, conversation_history=conversation_history)
+        
+        if result['success']:
+            return JsonResponse({
+                'success': True,
+                'response': result['response'],
+                'usage': result.get('usage', {}),
+                'mode': 'ai',
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': result.get('error', 'AI service unavailable'),
+                'mode': 'error',
+            }, status=503)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+# ============================================
+# ANALYTICS VIEWS
+# ============================================
+
+@login_required
+def analytics_dashboard(request):
+    school = School.objects.first()
+    students = Student.objects.filter(is_active=True)
+    total = students.count()
+    critical = students.filter(risk_level='CRITICAL').count()
+    warning = students.filter(risk_level='WARNING').count()
+    good = students.filter(risk_level='GOOD').count()
+    
+    context = {
+        'school': school,
+        'total_students': total,
+        'critical_count': critical,
+        'warning_count': warning,
+        'good_count': good,
+        'good_percentage': round(good / total * 100, 1) if total else 0,
+        'warning_percentage': round(warning / total * 100, 1) if total else 0,
+        'critical_percentage': round(critical / total * 100, 1) if total else 0,
+        'total_reports': DisciplineReport.objects.count(),
+        'reports_today': DisciplineReport.objects.filter(reported_at__date=timezone.now().date()).count(),
+        'streams': Stream.objects.filter(is_active=True).order_by('name'),
+        'categories': DisciplineCategory.objects.filter(is_active=True).order_by('order', 'name'),
+        'notification_count': request.user.notifications.filter(is_read=False).count(),
+        'unread_notifications': request.user.notifications.filter(is_read=False).order_by('-created_at')[:20],
+    }
+    return render(request, 'analytics_dashboard.html', context)
+
+
+# ============================================
+# MOBILE VIEWS
+# ============================================
+
+@login_required
+def mobile_dashboard(request):
+    students = Student.objects.filter(is_active=True).select_related('stream')
+    total = students.count()
+    critical = students.filter(risk_level='CRITICAL').count()
+    warning = students.filter(risk_level='WARNING').count()
+    good = students.filter(risk_level='GOOD').count()
+    
+    recent_reports = DisciplineReport.objects.select_related('student', 'category').order_by('-reported_at')[:15]
+    
+    context = {
+        'total_students': total,
+        'critical_count': critical,
+        'warning_count': warning,
+        'good_count': good,
+        'recent_reports': recent_reports,
+        'notification_count': request.user.notifications.filter(is_read=False).count(),
+    }
+    return render(request, 'mobile_dashboard.html', context)
+
+
+# ============================================
+# SCHOOL MANAGEMENT VIEWS
+# ============================================
+
+@login_required
+@user_passes_test(admin_required)
+def manage_subjects(request):
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        
+        if action == 'add_subject':
+            try:
+                school = School.objects.first()
+                Subject.objects.create(
+                    school=school,
+                    name=request.POST.get('name', '').strip(),
+                    code=request.POST.get('code', '').strip(),
+                    description=request.POST.get('description', ''),
+                )
+                messages.success(request, 'Subject added!')
+            except Exception as e:
+                messages.error(request, f'Error: {e}')
+        elif action == 'delete_subject':
+            subject = get_object_or_404(Subject, id=request.POST.get('subject_id'))
+            subject.delete()
+            messages.success(request, 'Subject deleted!')
+        return redirect('manage_subjects')
+    
+    subjects = Subject.objects.all().order_by('name')
+    context = {
+        'subjects': subjects,
+        'notification_count': request.user.notifications.filter(is_read=False).count(),
+    }
+    return render(request, 'manage_subjects.html', context)
+
+
+# ============================================
+# API TEST VIEWS
+# ============================================
+
+@login_required
+def api_test_page(request):
+    return render(request, 'api_test.html', {
+        'notification_count': request.user.notifications.filter(is_read=False).count(),
+    })
+
+
+# ============================================
+# WORKFLOW: APPROVALS, RESOLUTION, SANCTIONS, APPEALS, COMMS
+# ============================================
+
+def _can_review_reports(user):
+    """Admins and Class Teachers perform second sign-off."""
+    return user.is_superuser or user.groups.filter(name='ClassTeacher').exists()
+
+
+def _log_report_action(report, action, user, note=''):
+    ReportHistory.objects.create(
+        report=report, action=action, changed_by=user, note=note,
+        snapshot={
+            'approval_status': report.approval_status,
+            'is_resolved': report.is_resolved,
+            'points': report.points,
+        },
+    )
+
+
+@login_required
+@user_passes_test(lambda u: _can_review_reports(u))
+def review_report(request, report_id):
+    """Approve or reject a report requiring second sign-off."""
+    report = get_object_or_404(DisciplineReport.objects.select_related('student'), id=report_id)
+    if request.method == 'POST':
+        decision = request.POST.get('decision', '').upper()
+        notes = request.POST.get('review_notes', '')
+        if decision == 'APPROVE':
+            report.approve(request.user, notes)
+            _log_report_action(report, 'APPROVE', request.user, notes)
+            messages.success(request, f'? Report for {report.student.name} approved.')
+        elif decision == 'REJECT':
+            report.reject(request.user, notes)
+            _log_report_action(report, 'REJECT', request.user, notes)
+            messages.warning(request, f'Report for {report.student.name} rejected.')
+        else:
+            messages.error(request, 'Invalid decision.')
+        return redirect(request.POST.get('next', 'student_profile'), report.student_id)
+    return render(request, 'includes/report_review.html', {
+        'report': report,
+        'notification_count': request.user.notifications.filter(is_read=False).count(),
+    })
+
+
+@login_required
+@user_passes_test(lambda u: _can_review_reports(u))
+def resolve_report(request, report_id):
+    """Mark a report resolved with an intervention note."""
+    report = get_object_or_404(DisciplineReport, id=report_id)
+    if request.method == 'POST':
+        notes = request.POST.get('intervention_notes', '')
+        report.resolve(request.user, notes)
+        _log_report_action(report, 'RESOLVE', request.user, notes)
+        messages.success(request, f'? {report.student.name}\'s case marked resolved.')
+        return redirect(request.POST.get('next', 'student_profile'), report.student_id)
+    return redirect('student_profile', report.student_id)
+
+
+@login_required
+@user_passes_test(lambda u: _can_review_reports(u))
+def add_sanction(request, report_id):
+    """Attach a sanction (detention, counseling, etc.) to a report."""
+    report = get_object_or_404(DisciplineReport.select_related('student'), id=report_id)
+    if request.method == 'POST':
+        s_type = request.POST.get('sanction_type')
+        valid = [c[0] for c in Sanction.TYPE_CHOICES]
+        if s_type not in valid:
+            messages.error(request, 'Invalid sanction type.')
+            return redirect(request.POST.get('next', 'student_profile'), report.student_id)
+        Sanction.objects.create(
+            report=report,
+            student=report.student,
+            sanction_type=s_type,
+            description=request.POST.get('description', ''),
+            scheduled_date=request.POST.get('scheduled_date') or None,
+            assigned_to=get_object_or_404(User, id=request.POST['assigned_to']) if request.POST.get('assigned_to') else None,
+            created_by=request.user,
+        )
+        messages.success(request, f'⚖️ Sanction added for {report.student.name}.')
+        return redirect(request.POST.get('next', 'student_profile'), report.student_id)
+    return redirect('student_profile', report.student_id)
+
+
+@login_required
+@user_passes_test(lambda u: _can_review_reports(u))
+def update_sanction(request, sanction_id):
+    """Update a sanction's status / completion."""
+    sanction = get_object_or_404(Sanction, id=sanction_id)
+    if request.method == 'POST':
+        status = request.POST.get('status')
+        valid = [c[0] for c in Sanction.STATUS_CHOICES]
+        if status in valid:
+            sanction.status = status
+            if status == 'COMPLETED':
+                sanction.completed_date = timezone.now().date()
+            sanction.save(update_fields=['status', 'completed_date', 'updated_at'])
+            messages.success(request, 'Sanction updated.')
+        return redirect(request.POST.get('next', 'student_profile'), sanction.student_id)
+    return redirect('student_profile', sanction.student_id)
+
+
+@login_required
+def file_appeal(request, student_id):
+    """Student or parent files a dispute against a report."""
+    student = get_object_or_404(Student, id=student_id)
+    # Access: teacher/staff can appeal on behalf; parents only for their linked children
+    is_staff = _can_review_reports(request.user)
+    is_linked_parent = StudentParentLink.objects.filter(
+        student=student, parent__user=request.user, receive_notifications=True
+    ).exists()
+    if not (is_staff or is_linked_parent):
+        messages.error(request, 'You are not authorized to appeal for this student.')
+        return redirect('student_profile', student_id)
+    if request.method == 'POST':
+        report_id = request.POST.get('report_id')
+        report = get_object_or_404(DisciplineReport, id=report_id, student=student)
+        Appeal.objects.create(
+            report=report,
+            student=student,
+            filed_by=request.user,
+            filed_by_role='PARENT' if is_linked_parent and not is_staff else 'STAFF',
+            reason=request.POST.get('reason', ''),
+        )
+        messages.success(request, '? Appeal filed. The case will be reviewed by a senior staff member.')
+        return redirect('student_profile', student_id)
+    reports = DisciplineReport.objects.filter(student=student, is_deleted=False).order_by('-reported_at')
+    return render(request, 'includes/file_appeal.html', {
+        'student': student,
+        'reports': reports,
+        'notification_count': request.user.notifications.filter(is_read=False).count(),
+    })
+
+
+@login_required
+@user_passes_test(lambda u: _can_review_reports(u))
+def review_appeal(request, appeal_id):
+    """Senior staff upholds or overturns an appeal."""
+    appeal = get_object_or_404(Appeal, id=appeal_id)
+    if request.method == 'POST':
+        status = request.POST.get('status')
+        valid = [c[0] for c in Appeal.STATUS_CHOICES]
+        if status in valid:
+            appeal.review(request.user, status, request.POST.get('review_notes', ''))
+            messages.success(request, f'Appeal {status.lower()}.')
+        return redirect(request.POST.get('next', 'student_profile'), appeal.student_id)
+    return redirect('student_profile', appeal.student_id)
+
+
+@login_required
+@user_passes_test(lambda u: _can_review_reports(u))
+def communicate_parent(request, student_id):
+    """Send a consented communication to the student's parent/guardian."""
+    student = get_object_or_404(Student, id=student_id)
+    if request.method == 'POST':
+        channel = request.POST.get('channel', 'EMAIL')
+        parent_link = StudentParentLink.objects.filter(
+            student=student, receive_notifications=True
+        ).select_related('parent__user').first()
+        if not parent_link:
+            messages.warning(request, 'No parent/guardian linked for this student.')
+            return redirect('student_profile', student_id)
+        parent = parent_link.parent
+        consent = {
+            'EMAIL': parent.receive_email,
+            'SMS': parent.receive_sms,
+            'PUSH': parent.receive_push,
+        }.get(channel, False)
+        report_id = request.POST.get('report_id')
+        report = DisciplineReport.objects.filter(id=report_id, student=student).first() if report_id else None
+        log = CommunicationLog.objects.create(
+            student=student,
+            parent=parent,
+            channel=channel,
+            subject=request.POST.get('subject', 'Discipline Update'),
+            body=request.POST.get('body', ''),
+            report=report,
+            sent_by=request.user,
+            consent_given=consent,
+            status='SENT' if consent else 'FAILED',
+        )
+        if consent:
+            create_user_notification(
+                parent.user,
+                f'? Update: {student.name}',
+                log.body,
+                'info', student
+            )
+            messages.success(request, f'? Message sent to parent ({channel}).')
+        else:
+            messages.warning(request, f'Parent has not consented to {channel}; communication logged only.')
+        return redirect('student_profile', student_id)
+    links = StudentParentLink.objects.filter(student=student).select_related('parent__user')
+    return render(request, 'includes/communicate_parent.html', {
+        'student': student,
+        'links': links,
+        'notification_count': request.user.notifications.filter(is_read=False).count(),
+    })
+
+
+@login_required
+def student_history(request, student_id):
+    """Full audit timeline for a student (reports + approvals + sanctions + appeals)."""
+    student = get_object_or_404(Student, id=student_id)
+    history = ReportHistory.objects.filter(report__student=student).select_related('report', 'changed_by').order_by('-changed_at')
+    return render(request, 'includes/student_history.html', {
+        'student': student,
+        'history': history,
+        'notification_count': request.user.notifications.filter(is_read=False).count(),
+    })
+
+
+@login_required
+def report_history_api(request, report_id):
+    """JSON audit history for a single report (used by modals)."""
+    report = get_object_or_404(DisciplineReport, id=report_id)
+    data = [{
+        'action': h.action,
+        'changed_by': h.changed_by.get_full_name() if h.changed_by else 'System',
+        'changed_at': h.changed_at.isoformat(),
+        'note': h.note,
+    } for h in report.history.select_related('changed_by').order_by('-changed_at')]
+    return JsonResponse({'history': data})

@@ -1,0 +1,89 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parent Portal - Discipline Webster</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', sans-serif; } .glass-nav { background: rgba(255,255,255,0.95); backdrop-filter: blur(16px); border-bottom: 1px solid #e2e8f0; }</style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    {% include 'includes/navbar.html' %}
+    
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-900">Parent Portal</h1>
+            <p class="mt-1 text-sm text-gray-500">Monitor your children's progress and stay informed</p>
+        </div>
+        
+        {% for child in children_data %}
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-6 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                        <i class="fas fa-user-graduate text-blue-600 text-lg"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-semibold text-gray-900">{{ child.student.name }}</h2>
+                        <p class="text-sm text-gray-500">{{ child.student.admission_number }} - {{ child.student.form }} - {{ child.student.stream.name }}</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    {% if child.link.relationship %}
+                    <span class="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">{{ child.link.relationship }}</span>
+                    {% endif %}
+                    <a href="{% url 'parent_student_detail' child.student.id %}" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">View Details</a>
+                </div>
+            </div>
+            
+            <div class="p-6">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-gray-50 rounded-lg p-3 text-center">
+                        <p class="text-2xl font-bold text-gray-900">{{ child.risk_score }}</p>
+                        <p class="text-xs text-gray-500">Risk Score</p>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-3 text-center">
+                        <p class="text-2xl font-bold {% if child.student.risk_level == 'CRITICAL' %}text-red-600{% elif child.student.risk_level == 'WARNING' %}text-yellow-600{% else %}text-green-600{% endif %}">{{ child.student.risk_level }}</p>
+                        <p class="text-xs text-gray-500">Risk Level</p>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-3 text-center">
+                        <p class="text-2xl font-bold text-gray-900">{{ child.total_reports }}</p>
+                        <p class="text-xs text-gray-500">Reports</p>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-3 text-center">
+                        <p class="text-2xl font-bold text-purple-600">{{ child.total_points }}</p>
+                        <p class="text-xs text-gray-500">Points</p>
+                    </div>
+                </div>
+                
+                <h3 class="text-sm font-medium text-gray-700 mb-3">Recent Reports</h3>
+                <div class="space-y-2">
+                    {% for report in child.recent_reports %}
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div>
+                            <p class="text-sm font-medium text-gray-900">{{ report.category_name }}</p>
+                            <p class="text-xs text-gray-500">{{ report.reported_at|date:"M d, Y" }}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm font-medium text-red-600">+{{ report.points }} pts</p>
+                            <p class="text-xs text-gray-500">{{ report.rating }}</p>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <p class="text-sm text-gray-500 py-2">No recent reports</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+            <i class="fas fa-user-friends text-4xl text-gray-300 mb-4"></i>
+            <p class="text-gray-500">No children linked to your account.</p>
+        </div>
+        {% endfor %}
+    </main>
+</body>
+</html>

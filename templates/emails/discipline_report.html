@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>Discipline Report</title></head>
+<body style="font-family: Inter, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
+    <div style="background: linear-gradient(135deg, #2563eb, #7c3aed); color: white; padding: 20px; border-radius: 12px; margin-bottom: 20px;">
+        <h1 style="margin: 0; font-size: 1.5rem;">Disciplinary Report Notification</h1>
+        <p style="margin: 5px 0 0; opacity: 0.9;">{{ school.name|default:"Discipline Webster" }}</p>
+    </div>
+    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px;">
+        <p>Dear Parent/Guardian,</p>
+        <p>This is to inform you that <strong>{{ student_name }}</strong> has received a disciplinary report:</p>
+        <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
+            <tr><td style="padding: 8px; border-bottom: 1px solid #f1f5f9;"><strong>Category</strong></td><td style="padding: 8px; border-bottom: 1px solid #f1f5f9;">{{ category }}</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #f1f5f9;"><strong>Rating</strong></td><td style="padding: 8px; border-bottom: 1px solid #f1f5f9;">{{ rating }}</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #f1f5f9;"><strong>Points</strong></td><td style="padding: 8px; border-bottom: 1px solid #f1f5f9;">+{{ points }}</td></tr>
+            <tr><td style="padding: 8px;"><strong>Date</strong></td><td style="padding: 8px;">{{ date }}</td></tr>
+        </table>
+        <p>Please log in to the portal for more details and to discuss with the class teacher.</p>
+    </div>
+    <p style="text-align: center; color: #94a3b8; font-size: 0.875rem; margin-top: 20px;">Discipline Webster - School Management Platform</p>
+</body>
+</html>

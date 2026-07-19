@@ -1,0 +1,100 @@
+{% load static %}
+{% if user.is_authenticated %}
+<nav class="glass-nav sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between h-14 items-center">
+            <div class="flex items-center gap-4">
+                <a href="{% url 'dashboard' %}" class="flex items-center gap-2">
+                    <div class="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-gavel text-white text-sm"></i>
+                    </div>
+                    <span class="font-bold text-gray-900">Discipline Webster</span>
+                </a>
+            </div>
+            
+            <div class="hidden md:flex items-center gap-2">
+                <a href="{% url 'dashboard' %}" class="px-3 py-2 text-sm text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                    <i class="fas fa-tachometer-alt mr-1"></i>Dashboard
+                </a>
+                <a href="{% url 'analytics_dashboard' %}" class="px-3 py-2 text-sm text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                    <i class="fas fa-chart-line mr-1"></i>Analytics
+                </a>
+                <a href="{% url 'aether_dashboard' %}" class="px-3 py-2 text-sm bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all">
+                    <i class="fas fa-brain mr-1"></i>Aether AI
+                </a>
+                <a href="{% url 'ai_chat_page' %}" class="px-3 py-2 text-sm bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:shadow-lg transition-all">
+                    <i class="fas fa-comment-dots mr-1"></i>AI Chat
+                </a>
+            </div>
+            
+            <div class="flex items-center gap-3">
+                <div class="relative">
+                    <button id="notifBtn" class="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors relative">
+                        <i class="fas fa-bell text-lg"></i>
+                        {% if notification_count > 0 %}
+                        <span class="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">{{ notification_count }}</span>
+                        {% endif %}
+                    </button>
+                    <div id="notifDropdown" class="hidden absolute right-0 top-full mt-2 w-80 bg-white rounded-xl shadow-xl border border-gray-100 z-50 max-h-96 overflow-y-auto">
+                        <div class="p-3 border-b border-gray-100 font-semibold text-sm text-gray-900">Notifications</div>
+                        <div id="notifList">
+                            {% for notif in unread_notifications %}
+                            <a href="{% if notif.student %}{% url 'student_profile' notif.student.id %}{% else %}#{% endif %}" class="block p-3 hover:bg-gray-50 border-b border-gray-50 last:border-0">
+                                <div class="flex items-start gap-3">
+                                    <div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 {% if notif.notification_type == 'critical' %}bg-red-100 text-red-600{% elif notif.notification_type == 'warning' %}bg-yellow-100 text-yellow-600{% elif notif.notification_type == 'success' %}bg-green-100 text-green-600{% else %}bg-blue-100 text-blue-600{% endif %}">
+                                        <i class="fas {% if notif.notification_type == 'critical' %}fa-exclamation-triangle{% elif notif.notification_type == 'warning' %}fa-exclamation-circle{% elif notif.notification_type == 'success' %}fa-check-circle{% else %}fa-info-circle{% endif %} text-xs"></i>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <p class="text-sm font-medium text-gray-900 truncate">{{ notif.title }}</p>
+                                        <p class="text-xs text-gray-500 truncate">{{ notif.message|truncatechars:60 }}</p>
+                                        <p class="text-xs text-gray-400 mt-0.5">{{ notif.created_at|date:"M d, H:i" }}</p>
+                                    </div>
+                                </div>
+                            </a>
+                            {% empty %}
+                            <div class="p-6 text-center text-gray-500 text-sm">All caught up!</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="relative group">
+                    <button class="flex items-center gap-2 p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+                        {% if request.user.teacher_profile.profile_picture %}
+                        <img src="{{ request.user.teacher_profile.profile_picture.url }}" alt="" class="w-8 h-8 rounded-full object-cover">
+                        {% else %}
+                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center text-white text-sm font-bold">
+                            {{ request.user.get_full_name|default:request.user.username|slice:":1"|upper }}
+                        </div>
+                        {% endif %}
+                        <span class="hidden lg:block text-sm font-medium text-gray-700">{{ request.user.get_full_name|default:request.user.username }}</span>
+                        <i class="fas fa-chevron-down text-gray-400 text-xs"></i>
+                    </button>
+                    <div class="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-1 hidden group-hover:block z-50">
+                        <a href="{% url 'user_profile_settings' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"><i class="fas fa-user-cog mr-2 text-blue-600"></i>Profile</a>
+                        <a href="{% url 'dashboard' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"><i class="fas fa-tachometer-alt mr-2 text-gray-400"></i>Dashboard</a>
+                        <a href="{% url 'ai_dashboard' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"><i class="fas fa-brain mr-2 text-purple-600"></i>AI Dashboard</a>
+                        <a href="{% url 'gamification_dashboard' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"><i class="fas fa-trophy mr-2 text-yellow-600"></i>Gamification</a>
+                        <a href="{% url 'timetable' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"><i class="fas fa-calendar mr-2 text-green-600"></i>Timetable</a>
+                        <a href="{% url 'attendance_list' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"><i class="fas fa-clipboard-check mr-2 text-orange-600"></i>Attendance</a>
+                        {% if user.is_superuser %}
+                        <a href="{% url 'admin_dashboard' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"><i class="fas fa-cog mr-2 text-gray-400"></i>Admin Panel</a>
+                        {% endif %}
+                        <hr class="my-1 border-gray-100">
+                        <a href="{% url 'logout' %}" class="block px-4 py-2 text-sm text-red-600 hover:bg-red-50"><i class="fas fa-sign-out-alt mr-2"></i>Logout</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</nav>
+<script>
+document.getElementById('notifBtn').addEventListener('click', function(e) {
+    e.stopPropagation();
+    document.getElementById('notifDropdown').classList.toggle('hidden');
+});
+document.addEventListener('click', function() {
+    document.getElementById('notifDropdown').classList.add('hidden');
+});
+</script>
+{% endif %}

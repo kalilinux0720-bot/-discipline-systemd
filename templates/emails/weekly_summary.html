@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>Weekly Summary</title></head>
+<body style="font-family: Inter, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
+    <div style="background: linear-gradient(135deg, #2563eb, #7c3aed); color: white; padding: 20px; border-radius: 12px; margin-bottom: 20px;">
+        <h1 style="margin: 0; font-size: 1.5rem;">Weekly Summary</h1>
+        <p style="margin: 5px 0 0; opacity: 0.9;">{{ school.name|default:"Discipline Webster" }}</p>
+    </div>
+    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px;">
+        <p>Dear {{ parent_name }},</p>
+        <p>Here is the weekly summary for <strong>{{ student_name }}</strong>:</p>
+        <div style="background: #f8fafc; border-radius: 8px; padding: 15px; margin: 15px 0;">
+            <pre style="white-space: pre-wrap; font-family: Inter, sans-serif; font-size: 0.875rem;">{{ week_stats }}</pre>
+        </div>
+        <p>For more details, please visit the parent portal.</p>
+    </div>
+    <p style="text-align: center; color: #94a3b8; font-size: 0.875rem; margin-top: 20px;">Discipline Webster - School Management Platform</p>
+</body>
+</html>

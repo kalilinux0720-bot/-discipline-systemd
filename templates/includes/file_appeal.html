@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}File Appeal — Discipline Webster{% endblock %}
+
+{% block content %}
+<div class="card-modern float-up" style="max-width: 640px; margin: 2rem auto;">
+    <div class="card-header-modern">
+        <span class="header-icon">⚖️</span> File an Appeal
+    </div>
+    <div class="card-body p-4">
+        <p>Student: <strong>{{ student.name }}</strong> ({{ student.admission_number }})</p>
+        <form method="post">
+            {% csrf_token %}
+            <div class="mb-3">
+                <label class="form-label">Report being disputed</label>
+                <select name="report_id" class="form-control-modern" required>
+                    <option value="">-- Select a report --</option>
+                    {% for r in reports %}
+                    <option value="{{ r.id }}">{{ r.category_name }} ({{ r.get_rating_display }}, {{ r.reported_at|date:"M d, Y" }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Reason for appeal</label>
+                <textarea name="reason" class="form-control-modern" rows="4" required placeholder="Explain why this report should be reviewed…"></textarea>
+            </div>
+            <button type="submit" class="btn-modern btn-modern-primary"><i class="fas fa-paper-plane"></i> Submit Appeal</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

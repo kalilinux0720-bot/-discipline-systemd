@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Review Report — Discipline Webster{% endblock %}
+
+{% block content %}
+<div class="card-modern float-up" style="max-width: 640px; margin: 2rem auto;">
+    <div class="card-header-modern">
+        <span class="header-icon">✅</span> Review Report
+    </div>
+    <div class="card-body p-4">
+        <p><strong>Student:</strong> {{ report.student.name }} ({{ report.student.admission_number }})</p>
+        <p><strong>Offence:</strong> {{ report.category_name }}</p>
+        <p><strong>Rating:</strong> {{ report.get_rating_display }} &nbsp; <strong>Points:</strong> +{{ report.points }}</p>
+        <p><strong>Reported by:</strong> {{ report.reported_by.get_full_name|default:report.reported_by.username }}</p>
+        <p><strong>Comments:</strong> {{ report.comments|default:"—" }}</p>
+
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="student_profile">
+            <div class="mb-3">
+                <label class="form-label">Review Notes</label>
+                <textarea name="review_notes" class="form-control-modern" rows="3" placeholder="Add context for your decision…"></textarea>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="submit" name="decision" value="APPROVE" class="btn-modern btn-modern-success">
+                    <i class="fas fa-check"></i> Approve
+                </button>
+                <button type="submit" name="decision" value="REJECT" class="btn-modern btn-modern-danger">
+                    <i class="fas fa-times"></i> Reject
+                </button>
+                <a href="{% url 'student_profile' report.student_id %}" class="btn-modern btn-modern-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Student Audit History — Discipline Webster{% endblock %}
+
+{% block content %}
+<div class="card-modern float-up">
+    <div class="card-header-modern">
+        <span class="header-icon">📜</span> Audit History — {{ student.name }}
+    </div>
+    <div class="card-body p-4">
+        {% if not history %}
+            <p class="text-muted">No recorded changes yet.</p>
+        {% else %}
+            <div class="timeline">
+                {% for h in history %}
+                <div class="d-flex gap-3 mb-3">
+                    <div class="badge-modern badge-info">{{ h.action }}</div>
+                    <div>
+                        <strong>{{ h.changed_by.get_full_name|default:"System" }}</strong>
+                        <span class="text-muted"> · {{ h.changed_at|date:"M d, Y H:i" }}</span>
+                        {% if h.note %}<p class="mb-0">{{ h.note }}</p>{% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+        <a href="{% url 'student_profile' student.id %}" class="btn-modern btn-modern-secondary mt-2">← Back</a>
+    </div>
+</div>
+{% endblock %}

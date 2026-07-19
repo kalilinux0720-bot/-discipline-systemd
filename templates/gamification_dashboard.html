@@ -1,0 +1,155 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gamification - Discipline Webster</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', sans-serif; }</style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    {% include 'includes/navbar.html' %}
+    
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-8">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">Gamification Dashboard</h1>
+                <p class="mt-1 text-sm text-gray-500">Points, rewards, and leaderboards</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <div class="bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-2">
+                    <p class="text-xs text-yellow-700">Total Points Awarded</p>
+                    <p class="text-xl font-bold text-yellow-700">{{ total_points_awarded }}</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-100">
+                        <h3 class="font-semibold text-gray-900">Leaderboard - Top Students</h3>
+                    </div>
+                    <div class="divide-y divide-gray-100">
+                        {% for entry in top_students %}
+                        <div class="px-6 py-4 flex items-center justify-between hover:bg-gray-50">
+                            <div class="flex items-center gap-4">
+                                <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm
+                                    {% if forloop.counter == 1 %}bg-yellow-100 text-yellow-700
+                                    {% elif forloop.counter == 2 %}bg-gray-100 text-gray-700
+                                    {% elif forloop.counter == 3 %}bg-orange-100 text-orange-700
+                                    {% else %}bg-blue-50 text-blue-700{% endif %}">
+                                    {{ forloop.counter }}
+                                </div>
+                                <div>
+                                    <p class="font-medium text-gray-900">{{ entry.student.name }}</p>
+                                    <p class="text-xs text-gray-500">{{ entry.student.stream.name if entry.student.stream else 'N/A' }} - {{ entry.student.form }}</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-lg font-bold text-purple-600">{{ entry.total_points }}</p>
+                                <p class="text-xs text-gray-500">{{ entry.rewards_count }} rewards</p>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="px-6 py-8 text-center text-gray-500">No students with points yet</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="space-y-6">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-100">
+                        <h3 class="font-semibold text-gray-900">Award Points</h3>
+                    </div>
+                    <form method="POST" action="{% url 'award_points' 0 %}" class="p-4 space-y-3">
+                        {% csrf_token %}
+                        <input type="hidden" name="student_id" id="pointsStudentId">
+                        <input type="hidden" name="points" id="pointsValue">
+                        <input type="hidden" name="reason" id="pointsReason">
+                        <input type="hidden" name="description" id="pointsDesc">
+                        
+                        <select id="pointsStudent" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
+                            <option value="">Select Student</option>
+                            {% for entry in top_students %}
+                            <option value="{{ entry.student.id }}">{{ entry.student.name }}</option>
+                            {% endfor %}
+                        </select>
+                        
+                        <div class="grid grid-cols-2 gap-2">
+                            <button type="button" onclick="awardPoints(10, 'POSITIVE_BEHAVIOR', 'Good behavior')" class="px-3 py-2 bg-green-50 text-green-700 rounded-lg text-xs hover:bg-green-100">+10 Positive</button>
+                            <button type="button" onclick="awardPoints(5, 'PERFECT_ATTENDANCE', 'Perfect attendance')" class="px-3 py-2 bg-blue-50 text-blue-700 rounded-lg text-xs hover:bg-blue-100">+5 Attendance</button>
+                            <button type="button" onclick="awardPoints(-5, 'PENALTY', 'Penalty deduction')" class="px-3 py-2 bg-red-50 text-red-700 rounded-lg text-xs hover:bg-red-100">-5 Penalty</button>
+                            <button type="button" onclick="awardPoints(20, 'ACADEMIC_EXCELLENCE', 'Academic achievement')" class="px-3 py-2 bg-purple-50 text-purple-700 rounded-lg text-xs hover:bg-purple-100">+20 Academic</button>
+                        </div>
+                    </form>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-100">
+                        <h3 class="font-semibold text-gray-900">Recent Awards</h3>
+                    </div>
+                    <div class="divide-y divide-gray-100 max-h-80 overflow-y-auto">
+                        {% for award in recent_awards %}
+                        <div class="px-4 py-3 flex items-center gap-3">
+                            <div class="w-8 h-8 bg-yellow-50 rounded-full flex items-center justify-center">
+                                <i class="fas fa-trophy text-yellow-600 text-xs"></i>
+                            </div>
+                            <div class="flex-1">
+                                <p class="text-sm font-medium text-gray-900">{{ award.student.name }}</p>
+                                <p class="text-xs text-gray-500">{{ award.reward.name }}</p>
+                            </div>
+                            <p class="text-xs text-gray-400">{{ award.created_at|date:"M d" }}</p>
+                        </div>
+                        {% empty %}
+                        <div class="px-4 py-8 text-center text-gray-500 text-sm">No awards yet</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100">
+                <h3 class="font-semibold text-gray-900">Available Rewards</h3>
+            </div>
+            <div class="p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                {% for reward in rewards %}
+                <div class="border border-gray-100 rounded-xl p-4 hover:shadow-md transition-shadow">
+                    <div class="flex items-center gap-3 mb-2">
+                        <div class="w-10 h-10 rounded-full flex items-center justify-center" style="background-color: {{ reward.color }}20; color: {{ reward.color }}">
+                            <i class="fas {{ reward.icon }}"></i>
+                        </div>
+                        <div>
+                            <p class="font-medium text-gray-900 text-sm">{{ reward.name }}</p>
+                            <p class="text-xs text-gray-500">{{ reward.reward_type }}</p>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-500 mb-3">{{ reward.description|truncatechars:80 }}</p>
+                    <p class="text-sm font-medium text-purple-600">{{ reward.points_required }} pts required</p>
+                </div>
+                {% empty %}
+                <div class="col-span-4 text-center text-gray-500 py-4">No rewards configured</div>
+                {% endfor %}
+            </div>
+        </div>
+    </main>
+    
+    <script>
+    function awardPoints(points, reason, description) {
+        const studentId = document.getElementById('pointsStudent').value;
+        if (!studentId) { alert('Please select a student'); return; }
+        document.getElementById('pointsStudentId').value = studentId;
+        document.getElementById('pointsValue').value = points;
+        document.getElementById('pointsReason').value = reason;
+        document.getElementById('pointsDesc').value = description;
+        document.querySelector('form[method="POST"]').action = '/api/award-points/' + studentId + '/';
+        document.querySelector('form[method="POST"]').submit();
+    }
+    </script>
+</body>
+</html>

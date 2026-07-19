@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>Risk Alert</title></head>
+<body style="font-family: Inter, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
+    <div style="background: linear-gradient(135deg, #ef4444, #dc2626); color: white; padding: 20px; border-radius: 12px; margin-bottom: 20px;">
+        <h1 style="margin: 0; font-size: 1.5rem;">Risk Level Alert</h1>
+        <p style="margin: 5px 0 0; opacity: 0.9;">Immediate attention required</p>
+    </div>
+    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px;">
+        <p>Dear Parent/Guardian,</p>
+        <p>This is an important notification regarding <strong>{{ student_name }}</strong>:</p>
+        <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
+            <tr><td style="padding: 8px; border-bottom: 1px solid #f1f5f9;"><strong>Risk Score</strong></td><td style="padding: 8px; border-bottom: 1px solid #f1f5f9;"><strong>{{ risk_score }}%</strong></td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #f1f5f9;"><strong>Risk Level</strong></td><td style="padding: 8px; border-bottom: 1px solid #f1f5f9;"><strong>{{ risk_level }}</strong></td></tr>
+            <tr><td style="padding: 8px;"><strong>Date</strong></td><td style="padding: 8px;">{{ date }}</td></tr>
+        </table>
+        <p>Please contact the school administration immediately to discuss intervention strategies.</p>
+    </div>
+    <p style="text-align: center; color: #94a3b8; font-size: 0.875rem; margin-top: 20px;">Discipline Webster - School Management Platform</p>
+</body>
+</html>

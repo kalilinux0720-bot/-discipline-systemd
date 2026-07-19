@@ -38,12 +38,37 @@
 {% endblock %}
 
 {% block content %}
+<!-- 🎒 Cartoon Hero with Mascot -->
+<div class="cartoon-hero float-up">
+    <svg class="hero-mascot" viewBox="0 0 120 140" xmlns="http://www.w3.org/2000/svg" aria-label="School mascot">
+        <ellipse cx="60" cy="90" rx="42" ry="44" fill="#FFD700" stroke="#3A2E2E" stroke-width="4"/>
+        <ellipse cx="60" cy="98" rx="26" ry="30" fill="#FFFBEA" stroke="#3A2E2E" stroke-width="3"/>
+        <ellipse cx="20" cy="92" rx="12" ry="26" fill="#FFE66D" stroke="#3A2E2E" stroke-width="4"/>
+        <ellipse cx="100" cy="92" rx="12" ry="26" fill="#FFE66D" stroke="#3A2E2E" stroke-width="4"/>
+        <polygon points="60,18 22,34 60,50 98,34" fill="#4ECDC4" stroke="#3A2E2E" stroke-width="4"/>
+        <rect x="52" y="34" width="16" height="10" fill="#3A2E2E"/>
+        <circle cx="60" cy="14" r="7" fill="#FF6B6B" stroke="#3A2E2E" stroke-width="3"/>
+        <circle cx="44" cy="72" r="15" fill="#fff" stroke="#3A2E2E" stroke-width="4"/>
+        <circle cx="76" cy="72" r="15" fill="#fff" stroke="#3A2E2E" stroke-width="4"/>
+        <circle cx="46" cy="74" r="6" fill="#3A2E2E"/>
+        <circle cx="78" cy="74" r="6" fill="#3A2E2E"/>
+        <polygon points="60,82 52,92 68,92" fill="#FF6B6B" stroke="#3A2E2E" stroke-width="3"/>
+        <path d="M48 132 l-6 6 M48 132 l0 8 M48 132 l6 6" stroke="#3A2E2E" stroke-width="4" fill="none" stroke-linecap="round"/>
+        <path d="M72 132 l-6 6 M72 132 l0 8 M72 132 l6 6" stroke="#3A2E2E" stroke-width="4" fill="none" stroke-linecap="round"/>
+    </svg>
+    <div class="hero-text">
+        <h1>🌈 Discipline Webster</h1>
+        <p>Welcome back, Head Teacher! Let's make school awesome today. 🎉</p>
+    </div>
+    <span class="hero-emoji">📚</span>
+</div>
+
 <!-- AI Insights Banner -->
-<div class="alert-modern alert alert-info mb-4" data-aos="fade-up" style="background: linear-gradient(135deg, #7c3aed, #2563eb); color: white; border: none;">
+<div class="alert-modern alert alert-info mb-4 float-up" data-aos="fade-up" style="background: linear-gradient(135deg, #7c3aed, #2563eb); color: white; border: none;">
     <div class="d-flex justify-content-between align-items-center flex-wrap">
         <div>
             <i class="fas fa-robot fa-2x me-3"></i>
-            <strong>AI-Powered Discipline Management</strong>
+            <strong>🤖 AI-Powered Discipline Management</strong>
             <span class="ms-2 badge bg-light text-dark">Active</span>
             <p class="mb-0 mt-1 small opacity-75">Get real-time AI recommendations based on Kenyan Education Act 2013</p>
         </div>
@@ -65,42 +90,42 @@
 {% endif %}
 
 <!-- Stats Grid -->
-<div class="stat-grid" data-aos="fade-up">
-    <div class="stat-card">
-        <div class="stat-bg-icon"><i class="fas fa-users"></i></div>
-        <div class="stat-icon primary"><i class="fas fa-users"></i></div>
+<div class="stat-grid float-up">
+    <div class="stat-card pop-in">
+        <div class="stat-bg-icon">🧑‍🎓</div>
+        <div class="stat-icon primary">👧</div>
         <div class="stat-value">{{ total_students }}</div>
         <div class="stat-label">Total Students</div>
-        <div class="stat-change up"><i class="fas fa-arrow-up"></i> Enrolled</div>
+        <div class="stat-change up">📈 Enrolled</div>
     </div>
-    <div class="stat-card">
-        <div class="stat-bg-icon"><i class="fas fa-exclamation-triangle"></i></div>
-        <div class="stat-icon danger"><i class="fas fa-exclamation-triangle"></i></div>
+    <div class="stat-card pop-in" style="animation-delay: 0.1s;">
+        <div class="stat-bg-icon">🚨</div>
+        <div class="stat-icon danger">⚠️</div>
         <div class="stat-value">{{ critical_students }}</div>
         <div class="stat-label">Critical Cases</div>
-        <div class="stat-change down"><i class="fas fa-arrow-up"></i> Need Intervention</div>
+        <div class="stat-change down">🆘 Need Help</div>
     </div>
-    <div class="stat-card">
-        <div class="stat-bg-icon"><i class="fas fa-flag"></i></div>
-        <div class="stat-icon success"><i class="fas fa-flag"></i></div>
+    <div class="stat-card pop-in" style="animation-delay: 0.2s;">
+        <div class="stat-bg-icon">🚩</div>
+        <div class="stat-icon success">📝</div>
         <div class="stat-value">{{ total_reports }}</div>
         <div class="stat-label">Total Reports</div>
-        <div class="stat-change up">{{ reports_today }} today</div>
+        <div class="stat-change up">⏰ {{ reports_today }} today</div>
     </div>
-    <div class="stat-card">
-        <div class="stat-bg-icon"><i class="fas fa-user-clock"></i></div>
-        <div class="stat-icon info"><i class="fas fa-user-clock"></i></div>
+    <div class="stat-card pop-in" style="animation-delay: 0.3s;">
+        <div class="stat-bg-icon">🟢</div>
+        <div class="stat-icon info">👩‍🏫</div>
         <div class="stat-value">{{ online_count }}</div>
         <div class="stat-label">Online Teachers</div>
-        <div class="stat-change up"><i class="fas fa-circle" style="color: #10b981; font-size: 8px;"></i> Active</div>
+        <div class="stat-change up">💡 Active</div>
     </div>
 </div>
 
 <!-- Quick Actions -->
-<div class="card-modern mb-4" data-aos="fade-up">
+<div class="card-modern mb-4 float-up" data-aos="fade-up">
     <div class="card-header-modern">
-        <span class="header-icon"><i class="fas fa-cog"></i></span>
-        System Management
+        <span class="header-icon">🛠️</span>
+        School Tools
     </div>
     <div class="card-body p-3">
         <div class="d-flex flex-wrap gap-2">
@@ -126,9 +151,9 @@
 </div>
 
 <!-- Add Student -->
-<div class="card-modern mb-4" data-aos="fade-up">
+<div class="card-modern mb-4 float-up" data-aos="fade-up">
     <div class="card-header-modern">
-        <span class="header-icon"><i class="fas fa-plus-circle"></i></span>
+        <span class="header-icon">➕</span>
         Add Student
     </div>
     <div class="card-body p-4">
@@ -167,9 +192,9 @@
 </div>
 
 <!-- Students Table -->
-<div class="card-modern" data-aos="fade-up">
+<div class="card-modern float-up" data-aos="fade-up">
     <div class="card-header-modern">
-        <span class="header-icon"><i class="fas fa-search"></i></span>
+        <span class="header-icon">🔍</span>
         Students
         <span class="badge bg-light text-dark ms-2">{{ students.paginator.count }}</span>
     </div>

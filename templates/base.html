@@ -4,17 +4,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Disciplinary Management System{% endblock %}</title>
-    
+    <title>{% block title %}Discipline Webster 🎒{% endblock %}</title>
+     
     <!-- Bootstrap 5 -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    
+     
     <!-- Font Awesome 6 -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel='stylesheet' href='{% static 'css/profile-fixes.css' %}'>
     
-    <!-- Google Fonts - Inter -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <!-- Google Fonts - Fredoka One (playful cartoon font) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Cartoon Theme -->
+    <link rel='stylesheet' href='{% static 'css/cartoon.css' %}'>
     
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -805,13 +810,20 @@
     </style>
     {% block extra_css %}{% endblock %}
 </head>
-<body>
+<body class="cartoon-mode">
+    <!-- Floating decorative shapes 🎈 -->
+    <span class="cartoon-floaty" style="top: 18%; left: 4%; animation-delay: 0s;">⭐</span>
+    <span class="cartoon-floaty" style="top: 60%; left: 8%; animation-delay: 1.5s;">🎈</span>
+    <span class="cartoon-floaty" style="top: 30%; right: 6%; animation-delay: 0.8s;">🌟</span>
+    <span class="cartoon-floaty" style="top: 75%; right: 10%; animation-delay: 2.2s;">✏️</span>
+    <span class="cartoon-floaty" style="top: 45%; left: 50%; animation-delay: 3s;">🍎</span>
+
     {% if user.is_authenticated %}
     <nav class="navbar-modern navbar navbar-expand-lg">
         <div class="container">
             <!-- Brand -->
             <a class="navbar-brand" href="{% url 'dashboard' %}">
-                <span class="brand-icon"><i class="fas fa-gavel"></i></span>
+                <span class="brand-icon">🎓</span>
                 <span class="brand-text">
                     <span class="school-name">{{ school_name|default:"Disciplinary System" }}</span>
                     {% if school_motto %}
@@ -1000,5 +1012,60 @@
         window.markNotificationRead = markNotificationRead;
     </script>
     {% block extra_js %}{% endblock %}
+
+    <!-- 🎓 Cartoon School Mascot -->
+    <div class="cartoon-mascot" id="cartoonMascot" title="Hi friend! I'm Professor Webster!">
+        <div class="mascot-speech">Hi! I'm Prof. Webster 🎓 Stay awesome!</div>
+        <!-- Inline SVG cartoon owl mascot (school theme) -->
+        <svg viewBox="0 0 120 140" width="110" height="130" xmlns="http://www.w3.org/2000/svg" aria-label="School mascot owl">
+            <!-- body -->
+            <ellipse cx="60" cy="90" rx="42" ry="44" fill="#FFD700" stroke="#3A2E2E" stroke-width="4"/>
+            <!-- belly -->
+            <ellipse cx="60" cy="98" rx="26" ry="30" fill="#FFFBEA" stroke="#3A2E2E" stroke-width="3"/>
+            <!-- wings -->
+            <ellipse cx="20" cy="92" rx="12" ry="26" fill="#FFE66D" stroke="#3A2E2E" stroke-width="4"/>
+            <ellipse cx="100" cy="92" rx="12" ry="26" fill="#FFE66D" stroke="#3A2E2E" stroke-width="4"/>
+            <!-- graduation cap -->
+            <polygon points="60,18 22,34 60,50 98,34" fill="#4ECDC4" stroke="#3A2E2E" stroke-width="4"/>
+            <rect x="52" y="34" width="16" height="10" fill="#3A2E2E"/>
+            <circle cx="60" cy="14" r="7" fill="#FF6B6B" stroke="#3A2E2E" stroke-width="3"/>
+            <!-- eyes -->
+            <circle cx="44" cy="72" r="15" fill="#fff" stroke="#3A2E2E" stroke-width="4"/>
+            <circle cx="76" cy="72" r="15" fill="#fff" stroke="#3A2E2E" stroke-width="4"/>
+            <circle cx="46" cy="74" r="6" fill="#3A2E2E"/>
+            <circle cx="78" cy="74" r="6" fill="#3A2E2E"/>
+            <!-- beak -->
+            <polygon points="60,82 52,92 68,92" fill="#FF6B6B" stroke="#3A2E2E" stroke-width="3"/>
+            <!-- feet -->
+            <path d="M48 132 l-6 6 M48 132 l0 8 M48 132 l6 6" stroke="#3A2E2E" stroke-width="4" fill="none" stroke-linecap="round"/>
+            <path d="M72 132 l-6 6 M72 132 l0 8 M72 132 l6 6" stroke="#3A2E2E" stroke-width="4" fill="none" stroke-linecap="round"/>
+        </svg>
+    </div>
+    <script>
+        // Mascot wiggle on click + playful speech rotation
+        (function () {
+            var mascot = document.getElementById('cartoonMascot');
+            if (!mascot) return;
+            var lines = [
+                "Hi! I'm Prof. Webster 🎓 Stay awesome!",
+                "Keep up the good behaviour! ⭐",
+                "You're doing great today! 🌟",
+                "Learning is an adventure! 🚀",
+                "Be kind, be bright! 💛"
+            ];
+            var i = 0;
+            mascot.addEventListener('click', function () {
+                var speech = mascot.querySelector('.mascot-speech');
+                speech.textContent = lines[i % lines.length];
+                i++;
+                speech.style.opacity = '1';
+                speech.style.transform = 'translateY(0) scale(1)';
+                setTimeout(function () {
+                    speech.style.opacity = '0';
+                    speech.style.transform = 'translateY(8px) scale(0.8)';
+                }, 2500);
+            });
+        })();
+    </script>
 </body>
 </html>

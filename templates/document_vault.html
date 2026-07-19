@@ -1,0 +1,108 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Vault - {{ student.name }} - Discipline Webster</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', sans-serif; } .glass-nav { background: rgba(255,255,255,0.95); backdrop-filter: blur(16px); border-bottom: 1px solid #e2e8f0; }</style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    {% include 'includes/navbar.html' %}
+    
+    <main class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="flex items-center gap-4 mb-8">
+            <a href="{% url 'student_profile' student.id %}" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-arrow-left"></i>
+            </a>
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">Document Vault</h1>
+                <p class="mt-1 text-sm text-gray-500">Secure document storage for {{ student.name }}</p>
+            </div>
+        </div>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-1">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                    <div class="text-center mb-6">
+                        <div class="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                            <i class="fas fa-user-graduate text-blue-600 text-2xl"></i>
+                        </div>
+                        <h2 class="text-lg font-semibold text-gray-900">{{ student.name }}</h2>
+                        <p class="text-sm text-gray-500">{{ student.admission_number }}</p>
+                        <p class="text-sm text-gray-500">{{ student.form }} - {{ student.stream.name }}</p>
+                    </div>
+                    <form method="POST" enctype="multipart/form-data" class="space-y-4">
+                        {% csrf_token %}
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Document Type</label>
+                            <select name="document_type" required class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                {% for dt in doc_types %}
+                                <option value="{{ dt.0 }}">{{ dt.1 }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                            <input type="text" name="title" required placeholder="Document title" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">File</label>
+                            <input type="file" name="file" required class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                            <textarea name="description" rows="3" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
+                        </div>
+                        <div class="flex items-center">
+                            <input type="checkbox" name="is_confidential" id="confidential" class="mr-2">
+                            <label for="confidential" class="text-sm text-gray-700">Confidential</label>
+                        </div>
+                        <button type="submit" class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">Upload Document</button>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-100">
+                        <h3 class="font-semibold text-gray-900">Documents ({{ documents.count }})</h3>
+                    </div>
+                    <div class="divide-y divide-gray-100">
+                        {% for doc in documents %}
+                        <div class="px-6 py-4 hover:bg-gray-50">
+                            <div class="flex items-start justify-between">
+                                <div class="flex items-start gap-4">
+                                    <div class="w-10 h-10 bg-red-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                                        <i class="fas fa-file-pdf text-red-600"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="text-sm font-medium text-gray-900">{{ doc.title }}</h4>
+                                        <p class="text-xs text-gray-500">{{ doc.get_document_type_display }} {% if doc.is_confidential %}<span class="text-red-600">Confidential</span>{% endif %}</p>
+                                        <p class="text-xs text-gray-400 mt-1">Uploaded {{ doc.created_at|date:"M d, Y" }} {% if doc.uploaded_by %}by {{ doc.uploaded_by.get_full_name|default:doc.uploaded_by.username }}{% endif %}</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    {% if doc.file %}
+                                    <a href="{{ doc.file.url }}" target="_blank" class="px-3 py-1 bg-blue-50 text-blue-600 rounded-lg text-xs hover:bg-blue-100">View</a>
+                                    {% endif %}
+                                    <a href="{% url 'delete_document' doc_id=doc.id %}" onclick="return confirm('Delete this document?')" class="px-3 py-1 bg-red-50 text-red-600 rounded-lg text-xs hover:bg-red-100">Delete</a>
+                                </div>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="px-6 py-12 text-center text-gray-500">
+                            <i class="fas fa-folder-open text-4xl mb-3 text-gray-300"></i>
+                            <p>No documents uploaded yet</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</body>
+</html>

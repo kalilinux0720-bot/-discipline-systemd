@@ -1,0 +1,71 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mobile Dashboard - Discipline Webster</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <meta name="theme-color" content="#2563eb">
+    <style>body { font-family: 'Inter', sans-serif; }</style>
+</head>
+<body class="bg-gray-50 min-h-screen pb-20">
+    {% include 'includes/navbar.html' %}
+    
+    <main class="max-w-lg mx-auto px-4 py-6">
+        <div class="text-center mb-6">
+            <h1 class="text-2xl font-bold text-gray-900">Mobile Dashboard</h1>
+            <p class="text-sm text-gray-500">Quick overview</p>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-3 mb-6">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
+                <i class="fas fa-users text-blue-600 text-xl mb-2"></i>
+                <p class="text-2xl font-bold text-gray-900">{{ total_students }}</p>
+                <p class="text-xs text-gray-500">Students</p>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
+                <i class="fas fa-exclamation-triangle text-red-600 text-xl mb-2"></i>
+                <p class="text-2xl font-bold text-gray-900">{{ critical_count }}</p>
+                <p class="text-xs text-gray-500">Critical</p>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
+                <i class="fas fa-exclamation-circle text-yellow-600 text-xl mb-2"></i>
+                <p class="text-2xl font-bold text-gray-900">{{ warning_count }}</p>
+                <p class="text-xs text-gray-500">Warning</p>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
+                <i class="fas fa-check-circle text-green-600 text-xl mb-2"></i>
+                <p class="text-2xl font-bold text-gray-900">{{ good_count }}</p>
+                <p class="text-xs text-gray-500">Good</p>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="px-4 py-3 border-b border-gray-100">
+                <h3 class="font-semibold text-gray-900 text-sm">Recent Reports</h3>
+            </div>
+            <div class="divide-y divide-gray-100">
+                {% for report in recent_reports %}
+                <div class="px-4 py-3">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-900">{{ report.student.name }}</p>
+                            <p class="text-xs text-gray-500">{{ report.category_name }}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm font-medium text-red-600">+{{ report.points }}</p>
+                            <p class="text-xs text-gray-400">{{ report.reported_at|date:"M d" }}</p>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="px-4 py-8 text-center text-gray-500 text-sm">No recent reports</div>
+                {% endfor %}
+            </div>
+        </div>
+    </main>
+</body>
+</html>

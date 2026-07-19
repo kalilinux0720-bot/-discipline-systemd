@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Communicate with Parent — Discipline Webster{% endblock %}
+
+{% block content %}
+<div class="card-modern float-up" style="max-width: 640px; margin: 2rem auto;">
+    <div class="card-header-modern">
+        <span class="header-icon">📨</span> Message Parent / Guardian
+    </div>
+    <div class="card-body p-4">
+        <p>Student: <strong>{{ student.name }}</strong></p>
+        {% if not links %}
+            <div class="alert-modern alert alert-warning">No parent/guardian linked for this student.</div>
+        {% endif %}
+        <form method="post">
+            {% csrf_token %}
+            <div class="mb-3">
+                <label class="form-label">Channel</label>
+                <select name="channel" class="form-control-modern" required>
+                    <option value="EMAIL">Email</option>
+                    <option value="SMS">SMS</option>
+                    <option value="PUSH">Push</option>
+                    <option value="LETTER">Letter</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Linked contacts</label>
+                <ul class="list-group">
+                    {% for link in links %}
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>{{ link.parent.user.get_full_name|default:link.parent.user.username }} ({{ link.relationship }})</span>
+                        <span class="badge-modern badge-info">
+                            {% if link.parent.receive_email %}Email{% endif %}
+                            {% if link.parent.receive_sms %} · SMS{% endif %}
+                            {% if link.parent.receive_push %} · Push{% endif %}
+                        </span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Subject</label>
+                <input type="text" name="subject" class="form-control-modern" value="Discipline Update: {{ student.name }}" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Message</label>
+                <textarea name="body" class="form-control-modern" rows="4" required placeholder="Write a friendly, clear update…"></textarea>
+            </div>
+            <button type="submit" class="btn-modern btn-modern-primary"><i class="fas fa-paper-plane"></i> Send (consent-checked)</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
