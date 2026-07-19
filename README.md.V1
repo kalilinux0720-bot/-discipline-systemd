@@ -1,0 +1,122 @@
+Discipline System
+A full-featured school discipline & behavior management platform built with Django. It lets administrators, teachers, and class teachers log discipline incidents, track student risk scores, run approval workflows, and engage parents — all backed by AI-assisted analytics, gamification, attendance, timetabling, and a document vault.
+Features
+Core Discipline Management
+- Discipline categories — 24 built-in offense categories (attendance, academic, uniform, bullying, fighting, theft, substance, exam, etc.) each with a configurable risk_weight (1–5) and severity_level.
+- Discipline reports — log incidents against a student with a rating (Very Minor → Very Serious). Points are computed as rating_base_points × category.risk_weight.
+- Risk scoring — each student has a risk_score (0–100) and risk_level (GOOD / WARNING / CRITICAL). Scores auto-recompute from reports; CRITICAL is ≥60, WARNING is 30–59.
+- Explainable risk — Student.explain_risk() returns human-readable drivers, trend, and level reasoning for fair/legal defensibility.
+Workflow & Governance
+- Approval workflow — serious/critical reports (risk_weight ≥ 4) are auto-flagged for mandatory second sign-off (PENDING / APPROVED / REJECTED).
+- Resolution & interventions — assign reports, set follow-up dates, mark resolved, and record intervention notes.
+- Sanctions — link detention, community service, suspension, counseling, parent meetings, etc. to reports with lifecycle status.
+- Appeals — students/parents can dispute reports; overturning soft-deletes the original report.
+- Immutable audit trail — ReportHistory snapshots every mutation (create/update/approve/reject/resolve/delete/restore).
+User Roles & Safety
+- Roles — School Admin (superuser), Teacher, Class Teacher, Parent/Guardian.
+- Teacher approval — teachers register and require admin approval before activation; suspend/ban/delete controls included.
+- Rate limiting & anomaly tracking — RateLimitLog throttles per-teacher/per-student daily reports.
+- Soft delete & archival — discipline records and students are never hard-deleted; they are soft-deleted/archived with reason and actor for data protection/retention.
+Engagement
+- Notifications — in-app critical/warning/info/success alerts to class teachers and admins.
+- Parent communication log — every outbound email/SMS/push/letter is recorded with consent flagging (GDPR-style audit).
+- Parent portal — parents view linked children, reports, and notifications.
+AI & Analytics
+- AI recommendation engine — global, per-student, and per-class recommendations, risk stats, trend analysis, predictive analysis, behavior patterns, and intervention-effectiveness endpoints.
+- AI chat — conversational assistant with student-context awareness.
+- Aether AI — secondary chat integration (aether_integration.py).
+- Dashboards — admin, class-teacher, teacher, analytics, gamification, Aether, and mobile dashboards.
+Gamification
+- Student points — award/penalize points for positive behavior, interventions, perfect attendance, academic excellence, etc.
+- Rewards & leaderboards — badges, certificates, prizes; weekly/monthly/termly/yearly/all-time leaderboards.
+School Operations
+- School setup — school profile, grade levels, academic terms, streams, subjects.
+- Bulk student upload — Excel/CSV template (student_upload_template.xlsx).
+- Attendance — QR/NFC/manual/biometric check-in with status tracking.
+- Timetable — entries per stream/form/day with conflict checks.
+- Document vault — versioned, confidential-capable document storage (report cards, certificates, IDs, etc.).
+- Reporting & export — export discipline reports in multiple formats.
+API
+- REST API (/rest/...) — JWT-auth endpoints for students, reports, attendance, timetable, leaderboard, rewards, documents, analytics, parent views, and a health check.
+- AI API (/ai/api/...) — JSON endpoints powering the recommendation engine and dashboards.
+Tech Stack
+- Backend: Django 5.2 (Python 3.11/3.13)
+- Database: SQLite (dev) → PostgreSQL (prod, via dj-database-url / psycopg2)
+- API: Django REST Framework + SimpleJWT, django-filter, django-taggit
+- Realtime/Comms: Channels, SendGrid (email), qrcode
+- Auth/Security: django-otp (2FA), CORS headers
+- Storage: django-storages + boto3 (S3 for media in prod)
+- Static/Prod: WhiteNoise, Gunicorn
+- Data tooling: pandas, openpyxl, Pillow
+Project Structure
+-discipline-system/
+├── core/                  # Main Django app (models, views, urls, api, signals, middleware)
+│   ├── models.py          # All domain models
+│   ├── views.py           # Web views & dashboards
+│   ├── api.py             # REST API endpoints
+│   ├── ai_chat.py         # AI chat logic
+│   ├── aether_integration.py
+│   ├── automation.py      # Scheduled/automated tasks
+│   ├── notifications.py
+│   ├── migrations/
+│   └── management/commands/  # init_data, seed_categories, run_automation, etc.
+├── disciplinary_program/ # Django project settings, wsgi
+├── templates/            # HTML templates (dashboards, portals, emails)
+├── static/ / staticfiles/ / media/
+├── supabase/             # Supabase config (optional backend)
+├── requirements.txt
+├── vercel.json           # Vercel deployment config
+└── manage.py
+Installation
+# Clone
+git clone <repo-url>
+cd -discipline-system
+# Create & activate virtualenv
+python -m venv venv
+source venv/bin/activate        # Windows: venv\Scripts\activate
+# Install dependencies
+pip install -r requirements.txt
+# Configure environment (see .env)
+cp .env.example .env            # edit as needed
+# Apply migrations & seed
+python manage.py migrate
+python manage.py init_data      # or: manage.py seed_categories
+python manage.py createsuperuser
+# Run
+python manage.py runserver
+Configuration (.env)
+Key settings (loaded via python-dotenv):
+- DEBUG — True/False
+- SECRET_KEY
+- DATABASE_URL — PostgreSQL connection string for production
+- DJANGO_SETTINGS_MODULE — disciplinary_program.settings
+- Email (SendGrid) and storage (S3) credentials for production
+Key Management Commands
+- python manage.py init_data — seed initial school/categories data
+- python manage.py seed_categories — populate discipline categories
+- python manage.py run_automation — run scheduled automation tasks
+- python manage.py show_errors — surface runtime errors
+- python manage.py cleanup_profiles — tidy orphaned profiles
+Deployment
+Configured for Vercel (vercel.json): builds the WSGI app via @vercel/python (runtime python3.11) and serves static/media files. Production uses PostgreSQL (Supabase-compatible) and S3 storage via django-storages.
+vercel deploy
+Data Model Highlights
+Model
+School, GradeLevel, AcademicTerm, Stream
+Student
+DisciplineCategory
+DisciplineReport
+ReportHistory
+Sanction, Appeal
+Notification, CommunicationLog, RateLimitLog
+AttendanceRecord
+TimetableEntry
+Subject
+ParentProfile, StudentParentLink
+StudentPoints, Reward, StudentReward, LeaderboardEntry
+DocumentVault
+PasswordReset
+Notes
+- Discipline records and students are soft-deleted by design — historical integrity is preserved for audits.
+- Risk scores are decision-support guides for staff, not verdicts (Student.explain_risk()).
+- Communication respects parent consent flags per channel.
